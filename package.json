@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Survey Mobile App Backend API - RESTful API server for survey data collection and management",
   "scripts": {
-    "start": "node dist/server.js",
+    "start": "node api/server.js",
     "dev": "nodemon --exec ts-node -r tsconfig-paths/register src/server.ts",
-    "build": "prisma generate && tsc && tsc-alias && cp -r prisma dist/",
+    "build": "prisma generate && tsc && tsc-alias && cp -r prisma api/",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
