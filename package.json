@@ -7,7 +7,7 @@
     "start": "node dist/server.js",
     "dev": "nodemon --exec ts-node -r tsconfig-paths/register src/server.ts",
     "build": "tsc && tsc-alias",
-    "build:vercel": "tsc && tsc-alias && cp -r prisma dist/",
+    "build:vercel": "prisma generate && tsc && tsc-alias && cp -r prisma dist/",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",
