@@ -6,6 +6,23 @@ import compression from "compression";
 import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
 
+// Check for required environment variables
+const requiredEnvVars = [
+  "DATABASE_URL",
+  "JWT_SECRET",
+  "JWT_REFRESH_SECRET",
+  "ADMIN_EMAIL",
+  "ADMIN_PASSWORD",
+];
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error("Missing required environment variables:", missingEnvVars);
+  console.error(
+    "Please set these environment variables in your Vercel project settings"
+  );
+}
+
 import { config } from "../src/config/env";
 import { logger, stream } from "../src/config/logger";
 import { prisma } from "../src/config/database";
@@ -97,22 +114,39 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
-// Initialize database connection
+// Initialize database connection only once
+let isInitialized = false;
+
 const initializeApp = async () => {
+  if (isInitialized) return;
+
   try {
+    // Check if we have the required environment variables
+    if (missingEnvVars.length > 0) {
+      logger.warn(
+        "Skipping database initialization due to missing environment variables"
+      );
+      return;
+    }
+
     await prisma.$connect();
     logger.info("Database connected successfully");
 
     // Clean up expired sessions on startup
     const { AuthService } = await import("../src/services/authService");
     await AuthService.cleanupExpiredSessions();
+
+    isInitialized = true;
   } catch (error) {
     logger.error("Failed to initialize app", { error });
+    // Don't throw error in serverless environment
   }
 };
 
-// Initialize the app
-initializeApp();
+// Initialize the app when the module loads
+initializeApp().catch((error) => {
+  logger.error("Initialization error", { error });
+});
 
 // Export the Express app as a Vercel serverless function
 export default app;
