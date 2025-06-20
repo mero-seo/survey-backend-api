@@ -97,4 +97,13 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
+const port = config.port || 3001;
+
+// Start the server only if this file is run directly
+if (process.env.NODE_ENV !== "test") {
+  app.listen(port, () => {
+    logger.info(`Server listening on port ${port}`);
+  });
+}
+
 export default app;
