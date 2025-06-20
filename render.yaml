@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: survey-backend-api
+    env: node
+    plan: starter
+    healthCheckPath: /health
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: API_VERSION
+        value: v1
+      - key: DATABASE_URL
+        fromSecret: true
+      - key: JWT_SECRET
+        fromSecret: true
+      - key: JWT_REFRESH_SECRET
+        fromSecret: true
+      - key: JWT_EXPIRES_IN
+        value: 24h
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: REDIS_URL
+        fromSecret: true
+      - key: REDIS_PASSWORD
+        fromSecret: true
+      - key: ADMIN_EMAIL
+        fromSecret: true
+      - key: ADMIN_PASSWORD
+        fromSecret: true

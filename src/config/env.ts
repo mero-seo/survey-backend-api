@@ -39,7 +39,9 @@ const envSchema = Joi.object({
 
   // File Upload
   MAX_FILE_SIZE: Joi.number().default(5242880), // 5MB
-  UPLOAD_PATH: Joi.string().default("./uploads"),
+  UPLOAD_PATH: Joi.string().default(
+    process.env.NODE_ENV === "production" ? "/tmp/uploads" : "./uploads"
+  ),
 
   // Logging
   LOG_LEVEL: Joi.string()
@@ -58,7 +60,9 @@ const envSchema = Joi.object({
 
   // Export
   EXPORT_MAX_RECORDS: Joi.number().default(50000),
-  EXPORT_TEMP_DIR: Joi.string().default("./temp"),
+  EXPORT_TEMP_DIR: Joi.string().default(
+    process.env.NODE_ENV === "production" ? "/tmp/temp" : "./temp"
+  ),
 }).unknown();
 
 // Validate environment variables
