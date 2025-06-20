@@ -62,10 +62,21 @@ const envSchema = Joi.object({
 }).unknown();
 
 // Validate environment variables
-const { error, value: envVars } = envSchema.validate(process.env);
+const { error, value: envVars } = envSchema.validate(process.env, {
+  abortEarly: false, // Log all errors
+});
 
 if (error) {
-  throw new Error(`Config validation error: ${error.message}`);
+  console.error(
+    "🔴 FATAL: Missing or invalid environment variables. The application cannot start."
+  );
+  error.details.forEach((detail) => {
+    console.error(`- ${detail.message}`);
+  });
+  console.error(
+    "🔵 Please add the missing variables to your Vercel project's Environment Variables settings and redeploy."
+  );
+  process.exit(1);
 }
 
 // Export configuration

@@ -21,10 +21,5 @@ if (process.env.NODE_ENV === "development") {
   logger.debug("Prisma client initialized with query logging");
 }
 
-// Graceful shutdown
-process.on("beforeExit", async () => {
-  await prisma.$disconnect();
-});
-
 export { prisma };
 export default prisma;
