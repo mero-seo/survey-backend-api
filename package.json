@@ -2,7 +2,6 @@
   "name": "survey-backend-api",
   "version": "1.0.0",
   "description": "Survey Mobile App Backend API - RESTful API server for survey data collection and management",
-  "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
     "dev": "nodemon --exec ts-node -r tsconfig-paths/register src/server.ts",
