@@ -1,9 +1,11 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/dist/server.js"
+  "builds": [{ "src": "package.json", "use": "@vercel/static-build" }],
+  "functions": {
+    "dist/server.js": {
+      "memory": 1024,
+      "maxDuration": 30
     }
-  ]
+  },
+  "routes": [{ "src": "/(.*)", "dest": "/dist/server.js" }]
 }
