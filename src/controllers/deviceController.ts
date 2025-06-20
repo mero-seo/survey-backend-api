@@ -1,15 +1,15 @@
 import { Request, Response } from "express";
-import { prisma } from "@/config/database";
-import { logger } from "@/config/logger";
-import { AppError } from "@/utils/appError";
+import { prisma } from "../config/database";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
   sendNoContent,
-} from "@/utils/response";
-import { asyncHandler } from "@/middleware/errorHandler";
-import { parsePagination, calculatePagination } from "@/utils/response";
+} from "../utils/response";
+import { asyncHandler } from "../middleware/errorHandler";
+import { parsePagination, calculatePagination } from "../utils/response";
 
 /**
  * Device Controller

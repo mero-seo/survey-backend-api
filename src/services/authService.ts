@@ -1,11 +1,11 @@
-import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import { prisma } from "@/config/database";
-import { config } from "@/config/env";
-import { logger } from "@/config/logger";
-import { AppError } from "@/utils/appError";
-import { sanitizeUser } from "@/utils/response";
+import { prisma } from "../config/database";
+import { config } from "../config/env";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
+import { sanitizeUser } from "../utils/response";
 
 /**
  * Token pair interface

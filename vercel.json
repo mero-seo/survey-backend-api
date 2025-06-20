@@ -2,24 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist",
-        "buildCommand": "npm run vercel-build"
-      }
+      "src": "api/server.ts",
+      "use": "@vercel/node"
     }
   ],
-  "functions": {
-    "dist/server.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/dist/server.js"
+      "dest": "/api/server.ts"
     }
   ]
 }

@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { AuthService } from "@/services/authService";
-import { logger } from "@/config/logger";
-import { AppError } from "@/utils/appError";
-import { sendSuccess } from "@/utils/response";
-import { asyncHandler } from "@/middleware/errorHandler";
+import { AuthService } from "../services/authService";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
+import { sendSuccess } from "../utils/response";
+import { asyncHandler } from "../middleware/errorHandler";
 
 /**
  * Authentication Controller

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { DeviceController } from "@/controllers/deviceController";
-import { validate, deviceSchemas } from "@/middleware/validation";
-import { authenticate, authorize } from "@/middleware/auth";
+import { DeviceController } from "../controllers/deviceController";
+import { validate, deviceSchemas } from "../middleware/validation";
+import { authenticate, authorize } from "../middleware/auth";
 import { UserRole } from "@prisma/client";
 
 const router = Router();

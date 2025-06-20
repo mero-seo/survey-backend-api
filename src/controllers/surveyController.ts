@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
-import { SurveyService } from "@/services/surveyService";
-import { logger } from "@/config/logger";
-import { AppError } from "@/utils/appError";
-import { sendSuccess, sendCreated, sendPaginated } from "@/utils/response";
-import { asyncHandler } from "@/middleware/errorHandler";
-import { prisma } from "@/config/database";
+import { SurveyService } from "../services/surveyService";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
+import { sendSuccess, sendCreated, sendPaginated } from "../utils/response";
+import { asyncHandler } from "../middleware/errorHandler";
+import { prisma } from "../config/database";
 
 /**
  * Survey Controller

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import Joi from "joi";
-import { AppError } from "@/utils/appError";
+import { AppError } from "../utils/appError";
 
 /**
  * Validation middleware factory

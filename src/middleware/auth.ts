@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { prisma } from "@/config/database";
-import { logger } from "@/config/logger";
-import { config } from "@/config/env";
-import { AppError } from "@/utils/appError";
+import { prisma } from "../config/database";
+import { logger } from "../config/logger";
+import { config } from "../config/env";
+import { AppError } from "../utils/appError";
 import { UserRole } from "@prisma/client";
 
 // Extend Request interface to include user

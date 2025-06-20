@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
-import { logger } from "@/config/logger";
-import { config } from "@/config/env";
-import { AppError } from "@/utils/appError";
+import { logger } from "../config/logger";
+import { config } from "../config/env";
+import { AppError } from "../utils/appError";
 import { ValidationError } from "joi";
 
 /**

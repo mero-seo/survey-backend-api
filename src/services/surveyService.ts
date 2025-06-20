@@ -1,7 +1,7 @@
-import { prisma } from "@/config/database";
-import { logger } from "@/config/logger";
-import { AppError } from "@/utils/appError";
-import { calculatePagination, parsePagination } from "@/utils/response";
+import { prisma } from "../config/database";
+import { logger } from "../config/logger";
+import { AppError } from "../utils/appError";
+import { calculatePagination, parsePagination } from "../utils/response";
 import { Parser } from "json2csv";
 import { SurveyAnswer } from "@prisma/client";
 

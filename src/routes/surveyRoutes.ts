@@ -1,7 +1,11 @@
 import { Router } from "express";
-import { SurveyController } from "@/controllers/surveyController";
-import { validate, surveySchemas } from "@/middleware/validation";
-import { authenticate, authorize, authenticateDevice } from "@/middleware/auth";
+import { SurveyController } from "../controllers/surveyController";
+import { validate, surveySchemas } from "../middleware/validation";
+import {
+  authenticate,
+  authorize,
+  authenticateDevice,
+} from "../middleware/auth";
 import { UserRole } from "@prisma/client";
 
 const router = Router();
