@@ -2,7 +2,7 @@ import { Router } from "express";
 import authRoutes from "./authRoutes";
 import surveyRoutes from "./surveyRoutes";
 import deviceRoutes from "./deviceRoutes";
-import { config } from "@/config/env";
+import { config } from "../config/env";
 
 const router = Router();
 
