@@ -76,7 +76,7 @@ graph TD
 - **User**: email, name, password, role, permissions, organization, isActive, lastLogin, etc.
 - **Session**: userId, sessionToken, refreshToken, deviceInfo, ipAddress, userAgent, isActive, expiresAt.
 - **Device**: deviceId, location, name, status, configuration, lastSeen.
-- **Survey**: deviceId, location, answer (EXCELLENT/GOOD/POOR), timestamp, deviceInfo, syncStatus.
+- **Survey**: deviceId, location, answer (EXCELLENT/SATISFACTORY/AVERAGE), timestamp, deviceInfo, syncStatus.
 - **AuditLog**: userId, action, resource, details, timestamp.
 
 (See `prisma/schema.prisma` for full details.)

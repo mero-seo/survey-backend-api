@@ -95,7 +95,9 @@ export const surveySchemas = {
     body: Joi.object({
       deviceId: commonSchemas.deviceId.required(),
       location: commonSchemas.location.required(),
-      answer: Joi.string().valid("EXCELLENT", "GOOD", "POOR").required(),
+      answer: Joi.string()
+        .valid("EXCELLENT", "SATISFACTORY", "AVERAGE")
+        .required(),
       timestamp: Joi.date().iso().required(),
       deviceInfo: Joi.object({
         model: Joi.string().required(),
@@ -111,7 +113,9 @@ export const surveySchemas = {
       startDate: Joi.date().iso(),
       endDate: Joi.date().iso().min(Joi.ref("startDate")),
       location: commonSchemas.location.optional(),
-      answer: Joi.string().valid("EXCELLENT", "GOOD", "POOR").optional(),
+      answer: Joi.string()
+        .valid("EXCELLENT", "SATISFACTORY", "AVERAGE")
+        .optional(),
     }),
   },
 

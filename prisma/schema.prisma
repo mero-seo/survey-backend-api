@@ -132,8 +132,8 @@ type Configuration {
 // Enums
 enum SurveyAnswer {
     EXCELLENT
-    GOOD
-    POOR
+    SATISFACTORY
+    AVERAGE
 }
 
 enum SyncStatus {

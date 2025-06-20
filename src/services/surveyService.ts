@@ -27,31 +27,31 @@ interface SurveySubmissionData {
 interface SurveyStats {
   total: number;
   excellent: number;
-  good: number;
-  poor: number;
+  satisfactory: number;
+  average: number;
   percentages: {
     excellent: number;
-    good: number;
-    poor: number;
+    satisfactory: number;
+    average: number;
   };
   byLocation: Array<{
     location: string;
     total: number;
     excellent: number;
-    good: number;
-    poor: number;
+    satisfactory: number;
+    average: number;
     percentages: {
       excellent: number;
-      good: number;
-      poor: number;
+      satisfactory: number;
+      average: number;
     };
   }>;
   byDate: Array<{
     date: string;
     total: number;
     excellent: number;
-    good: number;
-    poor: number;
+    satisfactory: number;
+    average: number;
   }>;
 }
 
@@ -171,18 +171,21 @@ export class SurveyService {
 
       // Calculate totals
       const excellent =
-        totalCounts.find((c) => c.answer === "EXCELLENT")?._count.answer || 0;
-      const good =
-        totalCounts.find((c) => c.answer === "GOOD")?._count.answer || 0;
-      const poor =
-        totalCounts.find((c) => c.answer === "POOR")?._count.answer || 0;
-      const total = excellent + good + poor;
+        totalCounts.find((c) => c.answer === SurveyAnswer.EXCELLENT)?._count
+          .answer || 0;
+      const satisfactory =
+        totalCounts.find((c) => c.answer === SurveyAnswer.SATISFACTORY)?._count
+          .answer || 0;
+      const average =
+        totalCounts.find((c) => c.answer === SurveyAnswer.AVERAGE)?._count
+          .answer || 0;
+      const total = excellent + satisfactory + average;
 
       // Calculate percentages
       const percentages = {
         excellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
-        good: total > 0 ? Math.round((good / total) * 100) : 0,
-        poor: total > 0 ? Math.round((poor / total) * 100) : 0,
+        satisfactory: total > 0 ? Math.round((satisfactory / total) * 100) : 0,
+        average: total > 0 ? Math.round((average / total) * 100) : 0,
       };
 
       // Process location stats
@@ -193,8 +196,8 @@ export class SurveyService {
             location: item.location,
             total: 0,
             excellent: 0,
-            good: 0,
-            poor: 0,
+            satisfactory: 0,
+            average: 0,
           });
         }
 
@@ -210,13 +213,13 @@ export class SurveyService {
             location.total > 0
               ? Math.round((location.excellent / location.total) * 100)
               : 0,
-          good:
+          satisfactory:
             location.total > 0
-              ? Math.round((location.good / location.total) * 100)
+              ? Math.round((location.satisfactory / location.total) * 100)
               : 0,
-          poor:
+          average:
             location.total > 0
-              ? Math.round((location.poor / location.total) * 100)
+              ? Math.round((location.average / location.total) * 100)
               : 0,
         },
       }));
@@ -230,8 +233,8 @@ export class SurveyService {
             date,
             total: 0,
             excellent: 0,
-            good: 0,
-            poor: 0,
+            satisfactory: 0,
+            average: 0,
           });
         }
         dateMap.get(date)!.total += item._count.answer;
@@ -244,8 +247,8 @@ export class SurveyService {
       return {
         total,
         excellent,
-        good,
-        poor,
+        satisfactory,
+        average,
         percentages,
         byLocation,
         byDate,
@@ -509,9 +512,13 @@ export class SurveyService {
         period,
         totalSurveys: surveys.length,
         responseDistribution: {
-          excellent: surveys.filter((s) => s.answer === "EXCELLENT").length,
-          good: surveys.filter((s) => s.answer === "GOOD").length,
-          poor: surveys.filter((s) => s.answer === "POOR").length,
+          excellent: surveys.filter((s) => s.answer === SurveyAnswer.EXCELLENT)
+            .length,
+          satisfactory: surveys.filter(
+            (s) => s.answer === SurveyAnswer.SATISFACTORY
+          ).length,
+          average: surveys.filter((s) => s.answer === SurveyAnswer.AVERAGE)
+            .length,
         },
         dailyBreakdown: this.processDailyBreakdown(surveys, period),
         locationBreakdown: this.processLocationBreakdown(surveys),
@@ -571,14 +578,16 @@ export class SurveyService {
           date,
           total: 0,
           excellent: 0,
-          good: 0,
-          poor: 0,
+          satisfactory: 0,
+          average: 0,
         });
       }
 
       const dayData = dailyMap.get(date);
       dayData.total++;
-      dayData[survey.answer.toLowerCase()]++;
+      if (survey.answer === SurveyAnswer.EXCELLENT) dayData.excellent++;
+      if (survey.answer === SurveyAnswer.SATISFACTORY) dayData.satisfactory++;
+      if (survey.answer === SurveyAnswer.AVERAGE) dayData.average++;
     });
 
     return Array.from(dailyMap.values()).sort((a, b) =>
@@ -598,14 +607,17 @@ export class SurveyService {
           location: survey.location,
           total: 0,
           excellent: 0,
-          good: 0,
-          poor: 0,
+          satisfactory: 0,
+          average: 0,
         });
       }
 
       const locationData = locationMap.get(survey.location);
       locationData.total++;
-      locationData[survey.answer.toLowerCase()]++;
+      if (survey.answer === SurveyAnswer.EXCELLENT) locationData.excellent++;
+      if (survey.answer === SurveyAnswer.SATISFACTORY)
+        locationData.satisfactory++;
+      if (survey.answer === SurveyAnswer.AVERAGE) locationData.average++;
     });
 
     return Array.from(locationMap.values()).sort((a, b) => b.total - a.total);

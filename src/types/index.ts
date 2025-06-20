@@ -48,7 +48,7 @@ export interface PaginationMeta {
 export interface SurveySubmission {
   deviceId: string;
   location: string;
-  answer: "EXCELLENT" | "GOOD" | "POOR";
+  answer: "EXCELLENT" | "SATISFACTORY" | "AVERAGE";
   timestamp: Date;
   deviceInfo: DeviceInfo;
 }
@@ -62,7 +62,7 @@ export interface DeviceInfo {
 
 export interface SurveyFilters {
   location?: string;
-  answer?: "EXCELLENT" | "GOOD" | "POOR";
+  answer?: "EXCELLENT" | "SATISFACTORY" | "AVERAGE";
   startDate?: Date;
   endDate?: Date;
   deviceId?: string;
@@ -71,12 +71,12 @@ export interface SurveyFilters {
 export interface SurveyStats {
   total: number;
   excellent: number;
-  good: number;
-  poor: number;
+  satisfactory: number;
+  average: number;
   percentages: {
     excellent: number;
-    good: number;
-    poor: number;
+    satisfactory: number;
+    average: number;
   };
   byLocation: LocationStats[];
   byDate: DateStats[];
@@ -86,12 +86,12 @@ export interface LocationStats {
   location: string;
   total: number;
   excellent: number;
-  good: number;
-  poor: number;
+  satisfactory: number;
+  average: number;
   percentages: {
     excellent: number;
-    good: number;
-    poor: number;
+    satisfactory: number;
+    average: number;
   };
 }
 
@@ -99,8 +99,8 @@ export interface DateStats {
   date: string;
   total: number;
   excellent: number;
-  good: number;
-  poor: number;
+  satisfactory: number;
+  average: number;
 }
 
 /**
