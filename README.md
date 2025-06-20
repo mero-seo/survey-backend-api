@@ -202,7 +202,6 @@ See `.env.example` for all required variables, including:
 - `JWT_SECRET`, `JWT_REFRESH_SECRET`
 - `REDIS_URL`
 - `SMTP_HOST`, `SMTP_USER`, etc.
-- `ALLOWED_ORIGINS`
 - `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS`
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`
 - and more...

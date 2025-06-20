@@ -43,22 +43,7 @@ app.use(
 // CORS configuration
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-
-      if (config.cors.origins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // In development, allow localhost with any port
-      if (config.env === "development" && origin.includes("localhost")) {
-        return callback(null, true);
-      }
-
-      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-      return callback(new Error(msg), false);
-    },
+    origin: true, // Allow all origins for mobile APK compatibility
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],

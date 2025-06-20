@@ -302,29 +302,33 @@ export class DeviceController {
   });
 
   /**
-   * Ping device (update last seen)
+   * Ping device to update last seen timestamp
    * POST /api/v1/devices/:id/ping
    */
   static pingDevice = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const { deviceId } = req.params;
 
     const device = await prisma.device.findUnique({
-      where: { id },
+      where: { deviceId },
     });
 
     if (!device) {
       throw AppError.notFound("Device");
     }
 
-    // Update last seen
-    await prisma.device.update({
-      where: { id },
+    // Update lastSeen
+    const updatedDevice = await prisma.device.update({
+      where: { deviceId },
       data: {
         lastSeen: new Date(),
       },
     });
 
-    sendSuccess(res, { timestamp: new Date() }, "Device ping recorded");
+    sendSuccess(
+      res,
+      { lastSeen: updatedDevice.lastSeen },
+      "Device pinged successfully"
+    );
   });
 
   /**

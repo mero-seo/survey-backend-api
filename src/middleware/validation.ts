@@ -93,6 +93,7 @@ export const commonSchemas = {
 export const surveySchemas = {
   submit: {
     body: Joi.object({
+      clientSurveyId: Joi.string().optional(),
       deviceId: commonSchemas.deviceId.required(),
       location: commonSchemas.location.required(),
       answer: Joi.string()

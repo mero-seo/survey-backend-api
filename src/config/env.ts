@@ -33,9 +33,6 @@ const envSchema = Joi.object({
   FROM_EMAIL: Joi.string().email().default("noreply@surveyapp.com"),
   FROM_NAME: Joi.string().default("Survey App"),
 
-  // CORS
-  ALLOWED_ORIGINS: Joi.string().default("http://localhost:3000"),
-
   // Rate Limiting
   RATE_LIMIT_WINDOW_MS: Joi.number().default(900000), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: Joi.number().default(100),
@@ -102,12 +99,6 @@ export const config = {
       email: envVars.FROM_EMAIL,
       name: envVars.FROM_NAME,
     },
-  },
-
-  cors: {
-    origins: envVars.ALLOWED_ORIGINS.split(",").map((origin: string) =>
-      origin.trim()
-    ),
   },
 
   rateLimit: {

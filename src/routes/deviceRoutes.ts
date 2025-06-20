@@ -18,7 +18,7 @@ router.post(
 /**
  * Device ping (minimal authentication)
  */
-router.post("/:id/ping", DeviceController.pingDevice);
+router.post("/ping/:deviceId", DeviceController.pingDevice);
 
 /**
  * Protected routes (authentication required)

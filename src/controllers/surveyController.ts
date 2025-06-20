@@ -4,6 +4,7 @@ import { logger } from "@/config/logger";
 import { AppError } from "@/utils/appError";
 import { sendSuccess, sendCreated, sendPaginated } from "@/utils/response";
 import { asyncHandler } from "@/middleware/errorHandler";
+import { prisma } from "@/config/database";
 
 /**
  * Survey Controller
@@ -14,17 +15,84 @@ export class SurveyController {
    * POST /api/v1/surveys/submit
    */
   static submitSurvey = asyncHandler(async (req: Request, res: Response) => {
-    const { deviceId, location, answer, timestamp, deviceInfo } = req.body;
-
-    const surveyData = {
+    const {
+      clientSurveyId,
       deviceId,
       location,
       answer,
-      timestamp: new Date(timestamp),
+      timestamp,
       deviceInfo,
-    };
+    } = req.body;
 
-    const survey = await SurveyService.submitSurvey(surveyData);
+    // Enhanced duplicate check with client-side ID
+    if (clientSurveyId) {
+      const existingSurvey = await prisma.survey.findFirst({
+        where: { clientSurveyId: clientSurveyId },
+      });
+      if (existingSurvey) {
+        logger.warn(
+          `Duplicate survey submission ignored for client ID: ${clientSurveyId}`
+        );
+        return sendSuccess(
+          res,
+          { id: existingSurvey.id, status: "duplicate" },
+          "Duplicate survey ignored"
+        );
+      }
+    } else {
+      // Fallback for older clients: check for recent similar surveys
+      const fiveSecondsAgo = new Date(Date.now() - 5000);
+      const recentSurvey = await prisma.survey.findFirst({
+        where: {
+          deviceId,
+          location,
+          answer,
+          createdAt: {
+            gte: fiveSecondsAgo,
+          },
+        },
+      });
+
+      if (recentSurvey) {
+        logger.warn(
+          `Potential duplicate survey submission throttled for device: ${deviceId}`
+        );
+        throw new AppError(
+          "Duplicate survey submission detected. Please try again in a moment.",
+          429
+        );
+      }
+    }
+
+    // Find device and update lastSeen
+    const device = await prisma.device.update({
+      where: { deviceId: deviceId },
+      data: {
+        lastSeen: new Date(),
+      },
+    });
+
+    if (!device) {
+      throw AppError.notFound("Device not found");
+    }
+
+    // Create survey
+    const survey = await prisma.survey.create({
+      data: {
+        deviceId,
+        location,
+        answer,
+        timestamp,
+        deviceInfo,
+        syncStatus: "SYNCED",
+        updatedAt: new Date(),
+        ...(clientSurveyId && { clientSurveyId }),
+      },
+    });
+
+    logger.info(
+      `Survey submitted successfully. Survey ID: ${survey.id}, Client ID: ${clientSurveyId}`
+    );
 
     sendCreated(res, survey, "Survey submitted successfully");
   });

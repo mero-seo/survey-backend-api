@@ -11,16 +11,17 @@ datasource db {
 }
 
 model Survey {
-    id         String       @id @default(auto()) @map("_id") @db.ObjectId
-    deviceId   String
-    location   String
-    answer     SurveyAnswer
-    timestamp  DateTime
-    deviceInfo DeviceInfo
-    syncStatus SyncStatus   @default(PENDING)
-    retryCount Int          @default(0)
-    createdAt  DateTime     @default(now())
-    updatedAt  DateTime     @updatedAt
+    id             String       @id @default(auto()) @map("_id") @db.ObjectId
+    clientSurveyId String?      @unique
+    deviceId       String
+    location       String
+    answer         SurveyAnswer
+    timestamp      DateTime
+    deviceInfo     DeviceInfo
+    syncStatus     SyncStatus   @default(PENDING)
+    retryCount     Int          @default(0)
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @updatedAt
 
     // Relations
     device Device? @relation(fields: [deviceId], references: [deviceId])
