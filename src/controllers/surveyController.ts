@@ -213,9 +213,9 @@ export class SurveyController {
         deviceNames: devices.map((d) => d.name).filter(Boolean),
         deviceIds: deviceIds.map((d) => d.deviceId).filter(Boolean),
         timeShifts: [
-          { value: "morning", label: "Morning (5:00AM–11:59AM)" },
-          { value: "day", label: "Day (12:00PM–6:59PM)" },
-          { value: "night", label: "Night (7:00PM–4:59AM)" },
+          { value: "morning", label: "Morning (6:00AM–11:59AM)" },
+          { value: "day", label: "Day (12:00PM–5:59PM)" },
+          { value: "night", label: "Night (6:00PM–5:59AM)" },
         ],
         answers: ["EXCELLENT", "SATISFACTORY", "AVERAGE"],
         syncStatuses: ["SYNCED", "PENDING", "FAILED"],

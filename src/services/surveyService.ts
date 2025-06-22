@@ -601,6 +601,34 @@ export class SurveyService {
   }
 
   /**
+   * Convert UTC time to Nepal time (UTC+5:45)
+   */
+  private static convertToNepalTime(utcDate: Date): {
+    hours: number;
+    minutes: number;
+  } {
+    const utcHours = utcDate.getUTCHours();
+    const utcMinutes = utcDate.getUTCMinutes();
+
+    // Nepal is UTC+5:45
+    let nepalHours = utcHours + 5;
+    let nepalMinutes = utcMinutes + 45;
+
+    // Handle minute overflow
+    if (nepalMinutes >= 60) {
+      nepalHours += 1;
+      nepalMinutes -= 60;
+    }
+
+    // Handle hour overflow
+    if (nepalHours >= 24) {
+      nepalHours -= 24;
+    }
+
+    return { hours: nepalHours, minutes: nepalMinutes };
+  }
+
+  /**
    * Get shift-based analytics for dashboard
    * Returns data grouped by time shifts (morning, day, night) and ratings (excellent, satisfactory, average)
    */
@@ -629,16 +657,49 @@ export class SurveyService {
         night: { excellent: 0, satisfactory: 0, average: 0 },
       };
 
+      // Debug: Log a few sample timestamps to understand the timezone
+      if (surveys.length > 0) {
+        const sampleSurvey = surveys[0];
+        const nepalTime = this.convertToNepalTime(sampleSurvey.timestamp);
+        logger.info("Sample survey timestamp analysis", {
+          originalTimestamp: sampleSurvey.timestamp,
+          utcHours: sampleSurvey.timestamp.getUTCHours(),
+          utcMinutes: sampleSurvey.timestamp.getUTCMinutes(),
+          nepalHours: nepalTime.hours,
+          nepalMinutes: nepalTime.minutes,
+          isoString: sampleSurvey.timestamp.toISOString(),
+        });
+      }
+
       surveys.forEach((survey) => {
-        const hour = new Date(survey.timestamp).getHours();
+        // Convert UTC time to Nepal time
+        const nepalTime = this.convertToNepalTime(survey.timestamp);
+        const nepalHours = nepalTime.hours;
+
         let shift: "morning" | "day" | "night";
 
-        if (hour >= 5 && hour < 12) {
+        // Updated shift definitions for Nepal timezone:
+        // Morning: 6:00 AM - 11:59 AM (6-11)
+        // Day: 12:00 PM - 5:59 PM (12-17)
+        // Night: 6:00 PM - 5:59 AM (18-23, 0-5)
+        if (nepalHours >= 6 && nepalHours < 12) {
           shift = "morning";
-        } else if (hour >= 12 && hour < 19) {
+        } else if (nepalHours >= 12 && nepalHours < 18) {
           shift = "day";
         } else {
           shift = "night";
+        }
+
+        // Debug: Log some samples for verification
+        if (Math.random() < 0.01) {
+          // Log 1% of surveys for debugging
+          logger.info("Shift calculation debug", {
+            originalTimestamp: survey.timestamp,
+            utcHours: survey.timestamp.getUTCHours(),
+            nepalHours,
+            calculatedShift: shift,
+            answer: survey.answer,
+          });
         }
 
         shiftData[shift][
@@ -649,19 +710,19 @@ export class SurveyService {
       // Convert to chart format
       const chartData = [
         {
-          shift: "Morning",
+          shift: "Morning (6:00 AM - 11:59 AM)",
           excellent: shiftData.morning.excellent,
           satisfactory: shiftData.morning.satisfactory,
           average: shiftData.morning.average,
         },
         {
-          shift: "Day",
+          shift: "Day (12:00 PM - 5:59 PM)",
           excellent: shiftData.day.excellent,
           satisfactory: shiftData.day.satisfactory,
           average: shiftData.day.average,
         },
         {
-          shift: "Night",
+          shift: "Night (6:00 PM - 5:59 AM)",
           excellent: shiftData.night.excellent,
           satisfactory: shiftData.night.satisfactory,
           average: shiftData.night.average,
@@ -737,22 +798,41 @@ export class SurveyService {
     const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     if (filters.timeShift) {
-      const hour = { $hour: "$timestamp" };
+      // For MongoDB aggregation, we need to handle timezone conversion
+      // Since Nepal is UTC+5:45, we need to adjust the hour ranges accordingly
       let timeShiftCondition;
       switch (filters.timeShift) {
         case "morning":
+          // Morning: 6:00 AM - 11:59 AM Nepal time
+          // This corresponds to 0:15 AM - 6:14 AM UTC
+          // We'll use 0:00 AM - 6:00 AM UTC as an approximation
           timeShiftCondition = {
-            $and: [{ $gte: [hour, 5] }, { $lt: [hour, 12] }],
+            $and: [
+              { $gte: [{ $hour: "$timestamp" }, 0] },
+              { $lt: [{ $hour: "$timestamp" }, 6] },
+            ],
           };
           break;
         case "day":
+          // Day: 12:00 PM - 5:59 PM Nepal time
+          // This corresponds to 6:15 AM - 12:14 PM UTC
+          // We'll use 6:00 AM - 12:00 PM UTC as an approximation
           timeShiftCondition = {
-            $and: [{ $gte: [hour, 12] }, { $lt: [hour, 19] }],
+            $and: [
+              { $gte: [{ $hour: "$timestamp" }, 6] },
+              { $lt: [{ $hour: "$timestamp" }, 12] },
+            ],
           };
           break;
         case "night":
+          // Night: 6:00 PM - 5:59 AM Nepal time
+          // This corresponds to 12:15 PM - 0:14 AM UTC (next day)
+          // We'll use 12:00 PM - 0:00 AM UTC as an approximation
           timeShiftCondition = {
-            $or: [{ $gte: [hour, 19] }, { $lt: [hour, 5] }],
+            $or: [
+              { $gte: [{ $hour: "$timestamp" }, 12] },
+              { $lt: [{ $hour: "$timestamp" }, 0] },
+            ],
           };
           break;
       }
