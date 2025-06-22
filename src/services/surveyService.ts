@@ -4,6 +4,7 @@ import { AppError } from "../utils/appError";
 import { calculatePagination, parsePagination } from "../utils/response";
 import { Parser } from "json2csv";
 import { SurveyAnswer } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 /**
  * Survey submission data interface
@@ -153,111 +154,126 @@ export class SurveyService {
       if (query.search) filters.search = query.search;
 
       const whereClause = this.buildWhereClause(filters);
+      const { timeShiftAggregation, ...prismaWhere } = whereClause;
 
-      // Get total counts by answer
-      const totalCounts = await prisma.survey.groupBy({
-        by: ["answer"],
-        where: whereClause,
-        _count: {
-          answer: true,
-        },
-      });
+      let total = 0;
+      let excellent = 0;
+      let satisfactory = 0;
+      let average = 0;
+      let byLocation: any[] = [];
+      let byDate: any[] = [];
 
-      // Get counts by location
-      const locationCounts = await prisma.survey.groupBy({
-        by: ["location", "answer"],
-        where: whereClause,
-        _count: {
-          answer: true,
-        },
-      });
+      if (timeShiftAggregation) {
+        const pipeline = [
+          { $match: { $expr: timeShiftAggregation } },
+          {
+            $lookup: {
+              from: "devices",
+              localField: "deviceId",
+              foreignField: "deviceId",
+              as: "device",
+            },
+          },
+          { $unwind: { path: "$device", preserveNullAndEmptyArrays: true } },
+          { $match: prismaWhere },
+          { $group: { _id: "$answer", count: { $sum: 1 } } },
+        ];
+        const result = await prisma.$runCommandRaw({
+          aggregate: "surveys",
+          pipeline,
+          cursor: {},
+        });
+        const totalCounts = (result as any)?.cursor?.firstBatch || [];
 
-      // Get counts by date
-      const dateCounts = await prisma.survey.groupBy({
-        by: ["timestamp"],
-        where: whereClause,
-        _count: {
-          answer: true,
-        },
-        orderBy: {
-          timestamp: "asc",
-        },
-      });
+        excellent =
+          totalCounts.find((c: any) => c._id === "EXCELLENT")?.count || 0;
+        satisfactory =
+          totalCounts.find((c: any) => c._id === "SATISFACTORY")?.count || 0;
+        average = totalCounts.find((c: any) => c._id === "AVERAGE")?.count || 0;
+        total = excellent + satisfactory + average;
+        // NOTE: byLocation and byDate are intentionally left empty for timeShift queries to avoid complexity.
+      } else {
+        const totalCountsResult = await prisma.survey.groupBy({
+          by: ["answer"],
+          where: prismaWhere,
+          _count: { answer: true },
+        });
+        excellent =
+          totalCountsResult.find((c) => c.answer === "EXCELLENT")?._count
+            .answer || 0;
+        satisfactory =
+          totalCountsResult.find((c) => c.answer === "SATISFACTORY")?._count
+            .answer || 0;
+        average =
+          totalCountsResult.find((c) => c.answer === "AVERAGE")?._count
+            .answer || 0;
+        total = excellent + satisfactory + average;
 
-      // Calculate totals
-      const excellent =
-        totalCounts.find((c) => c.answer === SurveyAnswer.EXCELLENT)?._count
-          .answer || 0;
-      const satisfactory =
-        totalCounts.find((c) => c.answer === SurveyAnswer.SATISFACTORY)?._count
-          .answer || 0;
-      const average =
-        totalCounts.find((c) => c.answer === SurveyAnswer.AVERAGE)?._count
-          .answer || 0;
-      const total = excellent + satisfactory + average;
+        const byLocationResult = await prisma.survey.groupBy({
+          by: ["location", "answer"],
+          where: prismaWhere,
+          _count: { answer: true },
+        });
+        const locationMap = new Map<string, any>();
+        byLocationResult.forEach((item) => {
+          if (!locationMap.has(item.location)) {
+            locationMap.set(item.location, {
+              location: item.location,
+              total: 0,
+              excellent: 0,
+              satisfactory: 0,
+              average: 0,
+            });
+          }
+          const loc = locationMap.get(item.location);
+          loc.total += item._count.answer;
+          if (item.answer === "EXCELLENT") loc.excellent += item._count.answer;
+          if (item.answer === "SATISFACTORY")
+            loc.satisfactory += item._count.answer;
+          if (item.answer === "AVERAGE") loc.average += item._count.answer;
+        });
+        byLocation = Array.from(locationMap.values()).map((loc) => ({
+          ...loc,
+          percentages: {
+            excellent:
+              loc.total > 0 ? Math.round((loc.excellent / loc.total) * 100) : 0,
+            satisfactory:
+              loc.total > 0
+                ? Math.round((loc.satisfactory / loc.total) * 100)
+                : 0,
+            average:
+              loc.total > 0 ? Math.round((loc.average / loc.total) * 100) : 0,
+          },
+        }));
 
-      // Calculate percentages
+        const byDateResult = await prisma.survey.groupBy({
+          by: ["timestamp"],
+          where: prismaWhere,
+          _count: { answer: true },
+          orderBy: { timestamp: "asc" },
+        });
+        const dateMap = new Map<string, any>();
+        byDateResult.forEach((item) => {
+          const date = (item.timestamp as Date).toISOString().split("T")[0];
+          if (!dateMap.has(date)) {
+            dateMap.set(date, {
+              date,
+              total: 0,
+              excellent: 0,
+              satisfactory: 0,
+              average: 0,
+            });
+          }
+          dateMap.get(date).total += item._count.answer;
+        });
+        byDate = Array.from(dateMap.values());
+      }
+
       const percentages = {
         excellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
         satisfactory: total > 0 ? Math.round((satisfactory / total) * 100) : 0,
         average: total > 0 ? Math.round((average / total) * 100) : 0,
       };
-
-      // Process location stats
-      const locationMap = new Map<string, any>();
-      locationCounts.forEach((item) => {
-        if (!locationMap.has(item.location)) {
-          locationMap.set(item.location, {
-            location: item.location,
-            total: 0,
-            excellent: 0,
-            satisfactory: 0,
-            average: 0,
-          });
-        }
-
-        const locationStat = locationMap.get(item.location)!;
-        locationStat[item.answer.toLowerCase()] = item._count.answer;
-        locationStat.total += item._count.answer;
-      });
-
-      const byLocation = Array.from(locationMap.values()).map((location) => ({
-        ...location,
-        percentages: {
-          excellent:
-            location.total > 0
-              ? Math.round((location.excellent / location.total) * 100)
-              : 0,
-          satisfactory:
-            location.total > 0
-              ? Math.round((location.satisfactory / location.total) * 100)
-              : 0,
-          average:
-            location.total > 0
-              ? Math.round((location.average / location.total) * 100)
-              : 0,
-        },
-      }));
-
-      // Process date stats (group by day)
-      const dateMap = new Map<string, any>();
-      dateCounts.forEach((item) => {
-        const date = item.timestamp.toISOString().split("T")[0];
-        if (!dateMap.has(date)) {
-          dateMap.set(date, {
-            date,
-            total: 0,
-            excellent: 0,
-            satisfactory: 0,
-            average: 0,
-          });
-        }
-        dateMap.get(date)!.total += item._count.answer;
-      });
-
-      const byDate = Array.from(dateMap.values()).sort(
-        (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
 
       return {
         total,
@@ -283,8 +299,8 @@ export class SurveyService {
   }> {
     try {
       const { page, limit, skip, sortBy, sortOrder } = parsePagination(query);
-      const filters: SurveyFilters = {};
 
+      const filters: SurveyFilters = {};
       if (query.location) filters.location = query.location;
       if (query.answer) filters.answer = query.answer;
       if (query.startDate) filters.startDate = new Date(query.startDate);
@@ -297,37 +313,65 @@ export class SurveyService {
 
       const whereClause = this.buildWhereClause(filters);
 
-      // Get total count
-      const total = await prisma.survey.count({
-        where: whereClause,
-      });
+      let surveys: any[];
+      let total: number;
 
-      // Get surveys with enhanced includes
-      const surveys = await prisma.survey.findMany({
-        where: whereClause,
-        skip,
-        take: limit,
-        orderBy: {
-          [sortBy]: sortOrder,
-        },
-        include: {
-          device: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-              location: true,
+      if (whereClause.timeShiftAggregation) {
+        const { timeShiftAggregation, ...prismaWhere } = whereClause;
+
+        const pipeline: any[] = [
+          { $match: { $expr: timeShiftAggregation } },
+          {
+            $lookup: {
+              from: "devices",
+              localField: "deviceId",
+              foreignField: "deviceId",
+              as: "device",
             },
           },
-        },
-      });
+          { $unwind: { path: "$device", preserveNullAndEmptyArrays: true } },
+          { $match: prismaWhere },
+          { $sort: { [sortBy]: sortOrder === "asc" ? 1 : -1 } },
+        ];
+
+        const countPipeline = [...pipeline, { $count: "total" }];
+        const dataPipeline = [...pipeline, { $skip: skip }, { $limit: limit }];
+
+        const [totalResult, dataResult] = await Promise.all([
+          prisma.$runCommandRaw({
+            aggregate: "surveys",
+            pipeline: countPipeline,
+            cursor: {},
+          }),
+          prisma.$runCommandRaw({
+            aggregate: "surveys",
+            pipeline: dataPipeline,
+            cursor: {},
+          }),
+        ]);
+
+        // Extract total from the raw aggregation result
+        total = (totalResult as any)?.cursor?.firstBatch?.[0]?.total || 0;
+        // Extract documents from the raw aggregation result
+        surveys = (dataResult as any)?.cursor?.firstBatch || [];
+      } else {
+        total = await prisma.survey.count({ where: whereClause });
+        surveys = await prisma.survey.findMany({
+          where: whereClause,
+          skip,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          include: {
+            device: {
+              select: { id: true, name: true, status: true, location: true },
+            },
+          },
+        });
+      }
 
       const pagination = calculatePagination(page, limit, total);
 
-      return {
-        surveys,
-        pagination,
-      };
+      return { surveys, pagination };
     } catch (error) {
       logger.error("Get surveys error", { query, error });
       throw error;
@@ -560,86 +604,77 @@ export class SurveyService {
    * Build where clause for filtering surveys
    */
   static buildWhereClause(filters: SurveyFilters): any {
-    const where: any = { AND: [] }; // Using AND to combine clauses safely
+    const andConditions = [];
 
     if (filters.location) {
-      where.AND.push({ location: filters.location });
+      andConditions.push({ location: filters.location });
     }
 
     if (filters.answer) {
-      where.AND.push({ answer: filters.answer });
+      andConditions.push({ answer: filters.answer });
     }
 
     if (filters.startDate || filters.endDate) {
       const createdAt: any = {};
-      if (filters.startDate) {
-        createdAt.gte = filters.startDate;
-      }
-      if (filters.endDate) {
-        createdAt.lte = filters.endDate;
-      }
-      where.AND.push({ createdAt });
+      if (filters.startDate) createdAt.gte = new Date(filters.startDate);
+      if (filters.endDate) createdAt.lte = new Date(filters.endDate);
+      andConditions.push({ createdAt });
     }
 
     if (filters.deviceId) {
-      where.AND.push({ deviceId: filters.deviceId });
+      andConditions.push({ deviceId: filters.deviceId });
     }
 
     if (filters.syncStatus) {
-      where.AND.push({ syncStatus: filters.syncStatus });
-    }
-
-    if (filters.timeShift) {
-      // Correct MongoDB hour filtering using $expr
-      const hourExpr = { $hour: "$timestamp" };
-      switch (filters.timeShift) {
-        case "morning": // 5:00 - 11:59
-          where.AND.push({ $expr: { $gte: [hourExpr, 5] } });
-          where.AND.push({ $expr: { $lt: [hourExpr, 12] } });
-          break;
-        case "day": // 12:00 - 18:59
-          where.AND.push({ $expr: { $gte: [hourExpr, 12] } });
-          where.AND.push({ $expr: { $lt: [hourExpr, 19] } });
-          break;
-        case "night": // 19:00 - 4:59
-          where.AND.push({
-            $or: [
-              { $expr: { $gte: [hourExpr, 19] } },
-              { $expr: { $lt: [hourExpr, 5] } },
-            ],
-          });
-          break;
-      }
+      andConditions.push({ syncStatus: filters.syncStatus });
     }
 
     if (filters.deviceName) {
-      where.AND.push({
-        device: {
-          name: {
-            contains: filters.deviceName,
-            mode: "insensitive",
-          },
-        },
+      andConditions.push({
+        "device.name": { contains: filters.deviceName, mode: "insensitive" },
       });
     }
 
     if (filters.search) {
-      where.AND.push({
+      andConditions.push({
         OR: [
           { location: { contains: filters.search, mode: "insensitive" } },
           { deviceId: { contains: filters.search, mode: "insensitive" } },
           { answer: { contains: filters.search, mode: "insensitive" } },
-          {
-            device: {
-              name: { contains: filters.search, mode: "insensitive" },
-            },
-          },
+          { "device.name": { contains: filters.search, mode: "insensitive" } },
         ],
       });
     }
 
-    // If AND array is empty, return an empty object to fetch all records
-    return where.AND.length > 0 ? { AND: where.AND } : {};
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
+
+    if (filters.timeShift) {
+      const hour = { $hour: "$timestamp" };
+      let timeShiftCondition;
+      switch (filters.timeShift) {
+        case "morning":
+          timeShiftCondition = {
+            $and: [{ $gte: [hour, 5] }, { $lt: [hour, 12] }],
+          };
+          break;
+        case "day":
+          timeShiftCondition = {
+            $and: [{ $gte: [hour, 12] }, { $lt: [hour, 19] }],
+          };
+          break;
+        case "night":
+          timeShiftCondition = {
+            $or: [{ $gte: [hour, 19] }, { $lt: [hour, 5] }],
+          };
+          break;
+      }
+      if (timeShiftCondition) {
+        // This is a special marker for aggregation pipeline
+        where.timeShiftAggregation = timeShiftCondition;
+      }
+    }
+
+    return where;
   }
 
   /**
