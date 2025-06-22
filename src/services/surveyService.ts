@@ -139,8 +139,19 @@ export class SurveyService {
   /**
    * Get survey statistics
    */
-  static async getStats(filters: SurveyFilters = {}): Promise<SurveyStats> {
+  static async getStats(query: any): Promise<SurveyStats> {
     try {
+      const filters: SurveyFilters = {};
+      if (query.location) filters.location = query.location;
+      if (query.answer) filters.answer = query.answer;
+      if (query.startDate) filters.startDate = new Date(query.startDate);
+      if (query.endDate) filters.endDate = new Date(query.endDate);
+      if (query.deviceId) filters.deviceId = query.deviceId;
+      if (query.timeShift) filters.timeShift = query.timeShift;
+      if (query.deviceName) filters.deviceName = query.deviceName;
+      if (query.syncStatus) filters.syncStatus = query.syncStatus;
+      if (query.search) filters.search = query.search;
+
       const whereClause = this.buildWhereClause(filters);
 
       // Get total counts by answer
@@ -258,7 +269,7 @@ export class SurveyService {
         byDate,
       };
     } catch (error) {
-      logger.error("Get survey stats error", { filters, error });
+      logger.error("Get survey stats error", { query, error });
       throw error;
     }
   }
@@ -336,15 +347,19 @@ export class SurveyService {
     try {
       const { page, limit, skip, sortBy, sortOrder } = parsePagination(query);
 
-      const whereClause = {
-        location: locationId,
-        ...(query.startDate && {
-          createdAt: {
-            gte: new Date(query.startDate),
-            ...(query.endDate && { lte: new Date(query.endDate) }),
-          },
-        }),
-      };
+      // Create a filter object and add the locationId to it
+      const filters: SurveyFilters = {};
+      if (query.answer) filters.answer = query.answer;
+      if (query.startDate) filters.startDate = new Date(query.startDate);
+      if (query.endDate) filters.endDate = new Date(query.endDate);
+      if (query.deviceId) filters.deviceId = query.deviceId;
+      if (query.timeShift) filters.timeShift = query.timeShift;
+      if (query.deviceName) filters.deviceName = query.deviceName;
+      if (query.syncStatus) filters.syncStatus = query.syncStatus;
+      if (query.search) filters.search = query.search;
+      filters.location = locationId; // Always filter by the location from the URL
+
+      const whereClause = this.buildWhereClause(filters);
 
       // Get total count
       const total = await prisma.survey.count({
@@ -545,74 +560,86 @@ export class SurveyService {
    * Build where clause for filtering surveys
    */
   static buildWhereClause(filters: SurveyFilters): any {
-    const where: any = {};
+    const where: any = { AND: [] }; // Using AND to combine clauses safely
 
     if (filters.location) {
-      where.location = filters.location;
+      where.AND.push({ location: filters.location });
     }
 
     if (filters.answer) {
-      where.answer = filters.answer;
+      where.AND.push({ answer: filters.answer });
     }
 
     if (filters.startDate || filters.endDate) {
-      where.createdAt = {};
+      const createdAt: any = {};
       if (filters.startDate) {
-        where.createdAt.gte = filters.startDate;
+        createdAt.gte = filters.startDate;
       }
       if (filters.endDate) {
-        where.createdAt.lte = filters.endDate;
+        createdAt.lte = filters.endDate;
       }
+      where.AND.push({ createdAt });
     }
 
     if (filters.deviceId) {
-      where.deviceId = filters.deviceId;
+      where.AND.push({ deviceId: filters.deviceId });
     }
 
     if (filters.syncStatus) {
-      where.syncStatus = filters.syncStatus;
+      where.AND.push({ syncStatus: filters.syncStatus });
     }
 
     if (filters.timeShift) {
-      // Time shift filtering based on hour ranges
-      const hourRanges = {
-        morning: { gte: 5, lte: 11 },
-        day: { gte: 12, lte: 18 },
-        night: { OR: [{ gte: 19 }, { lte: 4 }] },
-      };
-
-      const range = hourRanges[filters.timeShift as keyof typeof hourRanges];
-      if (range) {
-        where.timestamp = {
-          ...where.timestamp,
-          ...range,
-        };
+      // Correct MongoDB hour filtering using $expr
+      const hourExpr = { $hour: "$timestamp" };
+      switch (filters.timeShift) {
+        case "morning": // 5:00 - 11:59
+          where.AND.push({ $expr: { $gte: [hourExpr, 5] } });
+          where.AND.push({ $expr: { $lt: [hourExpr, 12] } });
+          break;
+        case "day": // 12:00 - 18:59
+          where.AND.push({ $expr: { $gte: [hourExpr, 12] } });
+          where.AND.push({ $expr: { $lt: [hourExpr, 19] } });
+          break;
+        case "night": // 19:00 - 4:59
+          where.AND.push({
+            $or: [
+              { $expr: { $gte: [hourExpr, 19] } },
+              { $expr: { $lt: [hourExpr, 5] } },
+            ],
+          });
+          break;
       }
     }
 
     if (filters.deviceName) {
-      where.device = {
-        name: {
-          contains: filters.deviceName,
-          mode: "insensitive",
+      where.AND.push({
+        device: {
+          name: {
+            contains: filters.deviceName,
+            mode: "insensitive",
+          },
         },
-      };
+      });
     }
 
     if (filters.search) {
-      where.OR = [
-        { location: { contains: filters.search, mode: "insensitive" } },
-        { deviceId: { contains: filters.search, mode: "insensitive" } },
-        { answer: { contains: filters.search, mode: "insensitive" } },
-        {
-          device: {
-            name: { contains: filters.search, mode: "insensitive" },
+      where.AND.push({
+        OR: [
+          { location: { contains: filters.search, mode: "insensitive" } },
+          { deviceId: { contains: filters.search, mode: "insensitive" } },
+          { answer: { contains: filters.search, mode: "insensitive" } },
+          {
+            device: {
+              name: { contains: filters.search, mode: "insensitive" },
+            },
           },
-        },
-      ];
+        ],
+      });
     }
 
-    return where;
+    // If AND array is empty, return an empty object to fetch all records
+    return where.AND.length > 0 ? { AND: where.AND } : {};
   }
 
   /**

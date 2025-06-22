@@ -102,20 +102,8 @@ export class SurveyController {
    * GET /api/v1/surveys/stats
    */
   static getStats = asyncHandler(async (req: Request, res: Response) => {
-    const filters = {
-      location: req.query.location as string,
-      answer: req.query.answer as any,
-      startDate: req.query.startDate
-        ? new Date(req.query.startDate as string)
-        : undefined,
-      endDate: req.query.endDate
-        ? new Date(req.query.endDate as string)
-        : undefined,
-      deviceId: req.query.deviceId as string,
-    };
-
-    const stats = await SurveyService.getStats(filters);
-
+    // Forward all relevant query params to the service layer
+    const stats = await SurveyService.getStats(req.query as any);
     sendSuccess(res, stats, "Survey statistics retrieved successfully");
   });
 
@@ -161,19 +149,12 @@ export class SurveyController {
    * GET /api/v1/surveys/export
    */
   static exportSurveys = asyncHandler(async (req: Request, res: Response) => {
-    const filters = {
-      location: req.query.location as string,
-      answer: req.query.answer as any,
-      startDate: req.query.startDate
-        ? new Date(req.query.startDate as string)
-        : undefined,
-      endDate: req.query.endDate
-        ? new Date(req.query.endDate as string)
-        : undefined,
-      deviceId: req.query.deviceId as string,
-    };
-
     const format = (req.query.format as "csv" | "json") || "csv";
+
+    // Remove format from query to avoid passing it as a filter
+    const filters = { ...req.query };
+    delete filters.format;
+
     const exportData = await SurveyService.exportSurveys(filters, format);
 
     // Set appropriate headers for file download
