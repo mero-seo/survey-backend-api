@@ -601,6 +601,94 @@ export class SurveyService {
   }
 
   /**
+   * Get shift-based analytics for dashboard
+   * Returns data grouped by time shifts (morning, day, night) and ratings (excellent, satisfactory, average)
+   */
+  static async getShiftAnalytics(filters: SurveyFilters = {}): Promise<any> {
+    try {
+      const whereClause = this.buildWhereClause(filters);
+      const { timeShiftAggregation, ...prismaWhere } = whereClause;
+
+      // Get all surveys with their timestamps
+      const surveys = await prisma.survey.findMany({
+        where: prismaWhere,
+        select: {
+          answer: true,
+          timestamp: true,
+          deviceId: true,
+        },
+        orderBy: {
+          timestamp: "asc",
+        },
+      });
+
+      // Group by shift and rating
+      const shiftData = {
+        morning: { excellent: 0, satisfactory: 0, average: 0 },
+        day: { excellent: 0, satisfactory: 0, average: 0 },
+        night: { excellent: 0, satisfactory: 0, average: 0 },
+      };
+
+      surveys.forEach((survey) => {
+        const hour = new Date(survey.timestamp).getHours();
+        let shift: "morning" | "day" | "night";
+
+        if (hour >= 5 && hour < 12) {
+          shift = "morning";
+        } else if (hour >= 12 && hour < 19) {
+          shift = "day";
+        } else {
+          shift = "night";
+        }
+
+        shiftData[shift][
+          survey.answer.toLowerCase() as keyof typeof shiftData.morning
+        ]++;
+      });
+
+      // Convert to chart format
+      const chartData = [
+        {
+          shift: "Morning",
+          excellent: shiftData.morning.excellent,
+          satisfactory: shiftData.morning.satisfactory,
+          average: shiftData.morning.average,
+        },
+        {
+          shift: "Day",
+          excellent: shiftData.day.excellent,
+          satisfactory: shiftData.day.satisfactory,
+          average: shiftData.day.average,
+        },
+        {
+          shift: "Night",
+          excellent: shiftData.night.excellent,
+          satisfactory: shiftData.night.satisfactory,
+          average: shiftData.night.average,
+        },
+      ];
+
+      return {
+        chartData,
+        summary: {
+          total: surveys.length,
+          byShift: {
+            morning: Object.values(shiftData.morning).reduce(
+              (a, b) => a + b,
+              0
+            ),
+            day: Object.values(shiftData.day).reduce((a, b) => a + b, 0),
+            night: Object.values(shiftData.night).reduce((a, b) => a + b, 0),
+          },
+        },
+      };
+    } catch (error) {
+      logger.error("Error getting shift analytics", { error, filters });
+      throw error;
+    }
+  }
+
+  /**
    * Build where clause for filtering surveys
    */
   static buildWhereClause(filters: SurveyFilters): any {

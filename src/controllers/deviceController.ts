@@ -119,7 +119,15 @@ export class DeviceController {
       orderBy: {
         [sortBy]: sortOrder,
       },
-      include: {
+      select: {
+        id: true,
+        deviceId: true,
+        name: true,
+        location: true,
+        status: true,
+        lastSeen: true,
+        createdAt: true,
+        updatedAt: true,
         _count: {
           select: {
             surveys: true,

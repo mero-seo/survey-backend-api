@@ -359,4 +359,26 @@ export class SurveyController {
       `Updated ${surveyIds.length} surveys to ${status} status`
     );
   });
+
+  /**
+   * Get shift-based analytics for dashboard
+   * GET /api/v1/surveys/shift-analytics
+   */
+  static getShiftAnalytics = asyncHandler(
+    async (req: Request, res: Response) => {
+      const filters: any = {};
+      if (req.query.location) filters.location = req.query.location;
+      if (req.query.answer) filters.answer = req.query.answer;
+      if (req.query.startDate)
+        filters.startDate = new Date(req.query.startDate as string);
+      if (req.query.endDate)
+        filters.endDate = new Date(req.query.endDate as string);
+      if (req.query.deviceId) filters.deviceId = req.query.deviceId;
+      if (req.query.deviceName) filters.deviceName = req.query.deviceName;
+      if (req.query.timeShift) filters.timeShift = req.query.timeShift;
+
+      const analytics = await SurveyService.getShiftAnalytics(filters);
+      sendSuccess(res, analytics, "Shift analytics retrieved successfully");
+    }
+  );
 }

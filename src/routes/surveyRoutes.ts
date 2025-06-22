@@ -29,6 +29,12 @@ router.get("/filter-options", authenticate, SurveyController.getFilterOptions);
 
 router.get("/analytics", authenticate, SurveyController.getAnalytics);
 
+router.get(
+  "/shift-analytics",
+  authenticate,
+  SurveyController.getShiftAnalytics
+);
+
 router.get("/feed", authenticate, SurveyController.getSurveyFeed);
 
 /**
