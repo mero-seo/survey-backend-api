@@ -64,6 +64,10 @@ interface SurveyFilters {
   startDate?: Date;
   endDate?: Date;
   deviceId?: string;
+  timeShift?: string; // 'morning', 'day', 'night'
+  deviceName?: string;
+  syncStatus?: string;
+  search?: string; // General search across multiple fields
 }
 
 /**
@@ -275,6 +279,10 @@ export class SurveyService {
       if (query.startDate) filters.startDate = new Date(query.startDate);
       if (query.endDate) filters.endDate = new Date(query.endDate);
       if (query.deviceId) filters.deviceId = query.deviceId;
+      if (query.timeShift) filters.timeShift = query.timeShift;
+      if (query.deviceName) filters.deviceName = query.deviceName;
+      if (query.syncStatus) filters.syncStatus = query.syncStatus;
+      if (query.search) filters.search = query.search;
 
       const whereClause = this.buildWhereClause(filters);
 
@@ -283,7 +291,7 @@ export class SurveyService {
         where: whereClause,
       });
 
-      // Get surveys
+      // Get surveys with enhanced includes
       const surveys = await prisma.survey.findMany({
         where: whereClause,
         skip,
@@ -294,8 +302,10 @@ export class SurveyService {
         include: {
           device: {
             select: {
+              id: true,
               name: true,
               status: true,
+              location: true,
             },
           },
         },
@@ -534,35 +544,75 @@ export class SurveyService {
   /**
    * Build where clause for filtering surveys
    */
-  private static buildWhereClause(filters: SurveyFilters): any {
-    const whereClause: any = {};
+  static buildWhereClause(filters: SurveyFilters): any {
+    const where: any = {};
 
     if (filters.location) {
-      whereClause.location = {
-        contains: filters.location,
-        mode: "insensitive",
-      };
+      where.location = filters.location;
     }
 
     if (filters.answer) {
-      whereClause.answer = filters.answer;
-    }
-
-    if (filters.deviceId) {
-      whereClause.deviceId = filters.deviceId;
+      where.answer = filters.answer;
     }
 
     if (filters.startDate || filters.endDate) {
-      whereClause.createdAt = {};
+      where.createdAt = {};
       if (filters.startDate) {
-        whereClause.createdAt.gte = filters.startDate;
+        where.createdAt.gte = filters.startDate;
       }
       if (filters.endDate) {
-        whereClause.createdAt.lte = filters.endDate;
+        where.createdAt.lte = filters.endDate;
       }
     }
 
-    return whereClause;
+    if (filters.deviceId) {
+      where.deviceId = filters.deviceId;
+    }
+
+    if (filters.syncStatus) {
+      where.syncStatus = filters.syncStatus;
+    }
+
+    if (filters.timeShift) {
+      // Time shift filtering based on hour ranges
+      const hourRanges = {
+        morning: { gte: 5, lte: 11 },
+        day: { gte: 12, lte: 18 },
+        night: { OR: [{ gte: 19 }, { lte: 4 }] },
+      };
+
+      const range = hourRanges[filters.timeShift as keyof typeof hourRanges];
+      if (range) {
+        where.timestamp = {
+          ...where.timestamp,
+          ...range,
+        };
+      }
+    }
+
+    if (filters.deviceName) {
+      where.device = {
+        name: {
+          contains: filters.deviceName,
+          mode: "insensitive",
+        },
+      };
+    }
+
+    if (filters.search) {
+      where.OR = [
+        { location: { contains: filters.search, mode: "insensitive" } },
+        { deviceId: { contains: filters.search, mode: "insensitive" } },
+        { answer: { contains: filters.search, mode: "insensitive" } },
+        {
+          device: {
+            name: { contains: filters.search, mode: "insensitive" },
+          },
+        },
+      ];
+    }
+
+    return where;
   }
 
   /**

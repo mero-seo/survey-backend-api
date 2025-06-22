@@ -25,6 +25,8 @@ router.post(
  */
 router.get("/stats", validate(surveySchemas.stats), SurveyController.getStats);
 
+router.get("/filter-options", authenticate, SurveyController.getFilterOptions);
+
 router.get("/analytics", authenticate, SurveyController.getAnalytics);
 
 router.get("/feed", authenticate, SurveyController.getSurveyFeed);

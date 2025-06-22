@@ -117,6 +117,10 @@ export const surveySchemas = {
       answer: Joi.string()
         .valid("EXCELLENT", "SATISFACTORY", "AVERAGE")
         .optional(),
+      timeShift: Joi.string().valid("morning", "day", "night").optional(),
+      deviceName: Joi.string().min(1).max(100).optional(),
+      syncStatus: Joi.string().valid("SYNCED", "PENDING", "FAILED").optional(),
+      search: Joi.string().min(1).max(200).optional(),
     }),
   },
 

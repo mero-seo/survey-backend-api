@@ -190,6 +190,61 @@ export class SurveyController {
   });
 
   /**
+   * Get filter options (locations, device names, etc.)
+   * GET /api/v1/surveys/filter-options
+   */
+  static getFilterOptions = asyncHandler(
+    async (req: Request, res: Response) => {
+      const filters: any = {};
+
+      if (req.query.startDate)
+        filters.startDate = new Date(req.query.startDate as string);
+      if (req.query.endDate)
+        filters.endDate = new Date(req.query.endDate as string);
+
+      const whereClause = SurveyService.buildWhereClause(filters);
+
+      // Get unique locations
+      const locations = await prisma.survey.findMany({
+        where: whereClause,
+        select: { location: true },
+        distinct: ["location"],
+        orderBy: { location: "asc" },
+      });
+
+      // Get unique device names
+      const devices = await prisma.device.findMany({
+        where: { status: "ACTIVE" },
+        select: { name: true, location: true },
+        orderBy: { name: "asc" },
+      });
+
+      // Get unique device IDs
+      const deviceIds = await prisma.survey.findMany({
+        where: whereClause,
+        select: { deviceId: true },
+        distinct: ["deviceId"],
+        orderBy: { deviceId: "asc" },
+      });
+
+      const filterOptions = {
+        locations: locations.map((l) => l.location).filter(Boolean),
+        deviceNames: devices.map((d) => d.name).filter(Boolean),
+        deviceIds: deviceIds.map((d) => d.deviceId).filter(Boolean),
+        timeShifts: [
+          { value: "morning", label: "Morning (5:00AM–11:59AM)" },
+          { value: "day", label: "Day (12:00PM–6:59PM)" },
+          { value: "night", label: "Night (7:00PM–4:59AM)" },
+        ],
+        answers: ["EXCELLENT", "SATISFACTORY", "AVERAGE"],
+        syncStatuses: ["SYNCED", "PENDING", "FAILED"],
+      };
+
+      sendSuccess(res, filterOptions, "Filter options retrieved successfully");
+    }
+  );
+
+  /**
    * Get survey analytics for dashboard
    * GET /api/v1/surveys/analytics
    */
