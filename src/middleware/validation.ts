@@ -99,7 +99,7 @@ export const surveySchemas = {
       answer: Joi.string()
         .valid("EXCELLENT", "SATISFACTORY", "AVERAGE")
         .required(),
-      timestamp: Joi.date().iso().required(),
+      timestamp: Joi.date().iso().optional(),
       deviceInfo: Joi.object({
         model: Joi.string().required(),
         os: Joi.string().required(),
@@ -148,13 +148,6 @@ export const deviceSchemas = {
       deviceId: commonSchemas.deviceId.required(),
       location: commonSchemas.location.required(),
       name: Joi.string().min(2).max(100).required(),
-      configuration: Joi.object({
-        surveyInterval: Joi.number().integer().min(10).max(300).default(30),
-        theme: Joi.string()
-          .valid("default", "light", "dark")
-          .default("default"),
-        language: Joi.string().valid("en", "ne").default("en"),
-      }).default({}),
     }),
   },
 
@@ -168,11 +161,6 @@ export const deviceSchemas = {
       status: Joi.string()
         .valid("ACTIVE", "INACTIVE", "MAINTENANCE")
         .optional(),
-      configuration: Joi.object({
-        surveyInterval: Joi.number().integer().min(10).max(300).optional(),
-        theme: Joi.string().valid("default", "light", "dark").optional(),
-        language: Joi.string().valid("en", "ne").optional(),
-      }).optional(),
     }),
   },
 

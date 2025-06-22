@@ -35,15 +35,14 @@ model Survey {
 }
 
 model Device {
-    id            String        @id @default(auto()) @map("_id") @db.ObjectId
-    deviceId      String        @unique
-    location      String
-    name          String
-    status        DeviceStatus  @default(ACTIVE)
-    lastSeen      DateTime?
-    configuration Configuration
-    createdAt     DateTime      @default(now())
-    updatedAt     DateTime      @updatedAt
+    id        String       @id @default(auto()) @map("_id") @db.ObjectId
+    deviceId  String       @unique
+    location  String
+    name      String
+    status    DeviceStatus @default(ACTIVE)
+    lastSeen  DateTime?
+    createdAt DateTime     @default(now())
+    updatedAt DateTime     @updatedAt
 
     // Relations
     surveys Survey[]
@@ -123,12 +122,6 @@ type DeviceInfo {
     os         String
     version    String
     appVersion String
-}
-
-type Configuration {
-    surveyInterval Int    @default(30) // seconds
-    theme          String @default("default")
-    language       String @default("en")
 }
 
 // Enums

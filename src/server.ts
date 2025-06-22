@@ -3,7 +3,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
 import mongoSanitize from "express-mongo-sanitize";
 
 import { config } from "@/config/env";
@@ -11,6 +10,7 @@ import { logger, stream } from "@/config/logger";
 import { prisma } from "@/config/database";
 import routes from "@/routes";
 import { errorHandler, notFoundHandler } from "@/middleware/errorHandler";
+import { apiLimiter } from "@/middleware/rateLimiter";
 
 // Create Express app
 const app = express();
@@ -42,24 +42,6 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimit.windowMs,
-  max: config.rateLimit.max,
-  message: {
-    success: false,
-    error: {
-      message: "Too many requests from this IP, please try again later.",
-      code: "RATE_LIMIT_EXCEEDED",
-    },
-    timestamp: new Date().toISOString(),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use(limiter);
 
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
@@ -97,13 +79,13 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
-const port = config.port || 3001;
+// const port = config.port || 3001;
 
-// Start the server only if this file is run directly
-if (process.env.NODE_ENV !== "test") {
-  app.listen(port, () => {
-    logger.info(`Server listening on port ${port}`);
-  });
-}
+// // Start the server only if this file is run directly
+// if (process.env.NODE_ENV !== "test") {
+//   app.listen(port, () => {
+//     logger.info(`Server listening on port ${port}`);
+//   });
+// }
 
 export default app;

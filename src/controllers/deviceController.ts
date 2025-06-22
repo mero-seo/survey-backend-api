@@ -20,7 +20,12 @@ export class DeviceController {
    * POST /api/v1/devices/register
    */
   static registerDevice = asyncHandler(async (req: Request, res: Response) => {
-    const { deviceId, location, name, configuration } = req.body;
+    const { deviceId, location, name } = req.body;
+
+    // Validate required fields
+    if (!deviceId || !location || !name) {
+      throw AppError.validation("Device ID, location, and name are required");
+    }
 
     // Check if device already exists
     const existingDevice = await prisma.device.findUnique({
@@ -37,11 +42,6 @@ export class DeviceController {
         deviceId,
         location,
         name,
-        configuration: configuration || {
-          surveyInterval: 30,
-          theme: "default",
-          language: "en",
-        },
         lastSeen: new Date(),
       },
     });
@@ -57,7 +57,7 @@ export class DeviceController {
    */
   static updateDevice = asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, location, status, configuration } = req.body;
+    const { name, location, status } = req.body;
 
     // Check if device exists
     const existingDevice = await prisma.device.findUnique({
@@ -75,7 +75,6 @@ export class DeviceController {
         ...(name && { name }),
         ...(location && { location }),
         ...(status && { status }),
-        ...(configuration && { configuration }),
         updatedAt: new Date(),
       },
     });
@@ -173,6 +172,107 @@ export class DeviceController {
   });
 
   /**
+   * Get device by deviceId
+   * GET /api/v1/devices/by-device-id/:deviceId
+   */
+  static getDeviceByDeviceId = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { deviceId } = req.params;
+
+      const device = await prisma.device.findUnique({
+        where: { deviceId },
+        include: {
+          _count: {
+            select: {
+              surveys: true,
+            },
+          },
+        },
+      });
+
+      if (!device) {
+        throw AppError.notFound("Device");
+      }
+
+      sendSuccess(res, device, "Device retrieved successfully");
+    }
+  );
+
+  /**
+   * Get existing device locations for setup (public endpoint)
+   * GET /api/v1/devices/locations
+   */
+  static getDeviceLocations = asyncHandler(
+    async (req: Request, res: Response) => {
+      const devices = await prisma.device.findMany({
+        select: {
+          deviceId: true,
+          name: true,
+          location: true,
+          status: true,
+        },
+        orderBy: {
+          location: "asc",
+        },
+      });
+
+      sendSuccess(res, devices, "Device locations retrieved successfully");
+    }
+  );
+
+  /**
+   * Get device status by deviceId (public endpoint)
+   * GET /api/v1/devices/status-by-device-id/:deviceId
+   */
+  static getDeviceStatusByDeviceId = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { deviceId } = req.params;
+
+      const device = await prisma.device.findUnique({
+        where: { deviceId },
+        select: {
+          deviceId: true,
+          name: true,
+          status: true,
+          lastSeen: true,
+          location: true,
+          _count: {
+            select: {
+              surveys: {
+                where: {
+                  createdAt: {
+                    gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Last 24 hours
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!device) {
+        throw AppError.notFound("Device");
+      }
+
+      // Calculate online status (if last seen within 5 minutes)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const isOnline = device.lastSeen && device.lastSeen > fiveMinutesAgo;
+
+      const status = {
+        deviceId: device.deviceId,
+        name: device.name,
+        status: device.status,
+        isOnline,
+        lastSeen: device.lastSeen,
+        location: device.location,
+        surveysToday: device._count.surveys,
+      };
+
+      sendSuccess(res, status, "Device status retrieved successfully");
+    }
+  );
+
+  /**
    * Delete device
    * DELETE /api/v1/devices/:id
    */
@@ -197,69 +297,6 @@ export class DeviceController {
 
     sendNoContent(res);
   });
-
-  /**
-   * Get device configuration
-   * GET /api/v1/devices/:id/config
-   */
-  static getDeviceConfig = asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-
-    const device = await prisma.device.findUnique({
-      where: { id },
-      select: {
-        deviceId: true,
-        configuration: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!device) {
-      throw AppError.notFound("Device");
-    }
-
-    sendSuccess(res, device, "Device configuration retrieved successfully");
-  });
-
-  /**
-   * Update device configuration
-   * PUT /api/v1/devices/:id/config
-   */
-  static updateDeviceConfig = asyncHandler(
-    async (req: Request, res: Response) => {
-      const { id } = req.params;
-      const { configuration } = req.body;
-
-      // Check if device exists
-      const existingDevice = await prisma.device.findUnique({
-        where: { id },
-      });
-
-      if (!existingDevice) {
-        throw AppError.notFound("Device");
-      }
-
-      // Update configuration
-      const device = await prisma.device.update({
-        where: { id },
-        data: {
-          configuration: {
-            ...existingDevice.configuration,
-            ...configuration,
-          },
-          updatedAt: new Date(),
-        },
-      });
-
-      logger.info(`Device configuration updated: ${device.deviceId}`);
-
-      sendSuccess(
-        res,
-        device.configuration,
-        "Device configuration updated successfully"
-      );
-    }
-  );
 
   /**
    * Get device status

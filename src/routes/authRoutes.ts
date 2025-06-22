@@ -3,27 +3,24 @@ import { AuthController } from "../controllers/authController";
 import { validate, authSchemas } from "../middleware/validation";
 import { authenticate, authorize } from "../middleware/auth";
 import { UserRole } from "@prisma/client";
+import { apiLimiter, authLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
 /**
  * Public routes (no authentication required)
  */
-router.post("/login", validate(authSchemas.login), AuthController.login);
+router.post(
+  "/login",
+  authLimiter,
+  validate(authSchemas.login),
+  AuthController.login
+);
 router.post(
   "/refresh",
+  apiLimiter,
   validate(authSchemas.refreshToken),
   AuthController.refreshToken
-);
-router.post(
-  "/forgot-password",
-  validate(authSchemas.forgotPassword),
-  AuthController.forgotPassword
-);
-router.post(
-  "/reset-password",
-  validate(authSchemas.resetPassword),
-  AuthController.resetPassword
 );
 
 /**
@@ -35,11 +32,6 @@ router.post("/logout", AuthController.logout);
 router.post("/logout-all", AuthController.logoutAll);
 router.get("/me", AuthController.getProfile);
 router.put("/profile", AuthController.updateProfile);
-router.post(
-  "/change-password",
-  validate(authSchemas.changePassword),
-  AuthController.changePassword
-);
 router.get("/verify", AuthController.verifyToken);
 
 /**

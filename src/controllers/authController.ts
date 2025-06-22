@@ -26,6 +26,10 @@ export class AuthController {
       userAgent
     );
 
+    if (!result) {
+      throw AppError.unauthorized("Invalid email or password.");
+    }
+
     // Set secure HTTP-only cookie for refresh token
     res.cookie("refreshToken", result.tokens.refreshToken, {
       httpOnly: true,
@@ -144,53 +148,6 @@ export class AuthController {
     // Update user profile logic would go here
     // For now, we'll just return success
     sendSuccess(res, { name, organization }, "Profile updated successfully");
-  });
-
-  /**
-   * Forgot password
-   * POST /api/v1/auth/forgot-password
-   */
-  static forgotPassword = asyncHandler(async (req: Request, res: Response) => {
-    const { email } = req.body;
-
-    const token = await AuthService.generatePasswordResetToken(email);
-
-    // In a real application, you would send an email with the reset token
-    // For now, we'll just log it (remove in production)
-    if (process.env.NODE_ENV === "development") {
-      logger.info(`Password reset token for ${email}: ${token}`);
-    }
-
-    sendSuccess(res, null, "Password reset email sent");
-  });
-
-  /**
-   * Reset password
-   * POST /api/v1/auth/reset-password
-   */
-  static resetPassword = asyncHandler(async (req: Request, res: Response) => {
-    const { token, password } = req.body;
-
-    await AuthService.resetPassword(token, password);
-
-    sendSuccess(res, null, "Password reset successful");
-  });
-
-  /**
-   * Change password
-   * POST /api/v1/auth/change-password
-   */
-  static changePassword = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user?.id;
-    const { currentPassword, newPassword } = req.body;
-
-    if (!userId) {
-      throw AppError.unauthorized("User not authenticated");
-    }
-
-    await AuthService.changePassword(userId, currentPassword, newPassword);
-
-    sendSuccess(res, null, "Password changed successfully");
   });
 
   /**

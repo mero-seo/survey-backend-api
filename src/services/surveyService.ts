@@ -13,7 +13,7 @@ interface SurveySubmissionData {
   deviceId: string;
   location: string;
   answer: SurveyAnswer;
-  timestamp: Date;
+  timestamp?: Date; // Made optional since we use server time
   deviceInfo: {
     model: string;
     os: string;
@@ -110,13 +110,18 @@ export class SurveyService {
         throw AppError.conflict("Survey already submitted recently");
       }
 
-      // Create survey record
+      // Create survey record with server time in Nepal timezone
+      const serverTime = new Date();
+      const nepalTime = new Date(
+        serverTime.getTime() + (5 * 60 + 45) * 60 * 1000
+      ); // UTC+5:45
+
       const survey = await prisma.survey.create({
         data: {
           deviceId: data.deviceId,
           location: data.location,
           answer: data.answer,
-          timestamp: data.timestamp,
+          timestamp: nepalTime, // Use server time converted to Nepal timezone
           deviceInfo: data.deviceInfo,
           syncStatus: "SYNCED",
         },
@@ -154,120 +159,81 @@ export class SurveyService {
       if (query.search) filters.search = query.search;
 
       const whereClause = this.buildWhereClause(filters);
-      const { timeShiftAggregation, ...prismaWhere } = whereClause;
 
-      let total = 0;
-      let excellent = 0;
-      let satisfactory = 0;
-      let average = 0;
-      let byLocation: any[] = [];
-      let byDate: any[] = [];
+      const totalCountsResult = await prisma.survey.groupBy({
+        by: ["answer"],
+        where: whereClause,
+        _count: { answer: true },
+      });
+      const excellent =
+        totalCountsResult.find((c) => c.answer === "EXCELLENT")?._count
+          .answer || 0;
+      const satisfactory =
+        totalCountsResult.find((c) => c.answer === "SATISFACTORY")?._count
+          .answer || 0;
+      const average =
+        totalCountsResult.find((c) => c.answer === "AVERAGE")?._count.answer ||
+        0;
+      const total = excellent + satisfactory + average;
 
-      if (timeShiftAggregation) {
-        const pipeline = [
-          { $match: { $expr: timeShiftAggregation } },
-          {
-            $lookup: {
-              from: "devices",
-              localField: "deviceId",
-              foreignField: "deviceId",
-              as: "device",
-            },
-          },
-          { $unwind: { path: "$device", preserveNullAndEmptyArrays: true } },
-          { $match: prismaWhere },
-          { $group: { _id: "$answer", count: { $sum: 1 } } },
-        ];
-        const result = await prisma.$runCommandRaw({
-          aggregate: "surveys",
-          pipeline,
-          cursor: {},
-        });
-        const totalCounts = (result as any)?.cursor?.firstBatch || [];
+      const byLocationResult = await prisma.survey.groupBy({
+        by: ["location", "answer"],
+        where: whereClause,
+        _count: { answer: true },
+      });
+      const locationMap = new Map<string, any>();
+      byLocationResult.forEach((item) => {
+        if (!locationMap.has(item.location)) {
+          locationMap.set(item.location, {
+            location: item.location,
+            total: 0,
+            excellent: 0,
+            satisfactory: 0,
+            average: 0,
+          });
+        }
+        const loc = locationMap.get(item.location);
+        loc.total += item._count.answer;
+        if (item.answer === "EXCELLENT") loc.excellent += item._count.answer;
+        if (item.answer === "SATISFACTORY")
+          loc.satisfactory += item._count.answer;
+        if (item.answer === "AVERAGE") loc.average += item._count.answer;
+      });
+      const byLocation = Array.from(locationMap.values()).map((loc) => ({
+        ...loc,
+        percentages: {
+          excellent:
+            loc.total > 0 ? Math.round((loc.excellent / loc.total) * 100) : 0,
+          satisfactory:
+            loc.total > 0
+              ? Math.round((loc.satisfactory / loc.total) * 100)
+              : 0,
+          average:
+            loc.total > 0 ? Math.round((loc.average / loc.total) * 100) : 0,
+        },
+      }));
 
-        excellent =
-          totalCounts.find((c: any) => c._id === "EXCELLENT")?.count || 0;
-        satisfactory =
-          totalCounts.find((c: any) => c._id === "SATISFACTORY")?.count || 0;
-        average = totalCounts.find((c: any) => c._id === "AVERAGE")?.count || 0;
-        total = excellent + satisfactory + average;
-        // NOTE: byLocation and byDate are intentionally left empty for timeShift queries to avoid complexity.
-      } else {
-        const totalCountsResult = await prisma.survey.groupBy({
-          by: ["answer"],
-          where: prismaWhere,
-          _count: { answer: true },
-        });
-        excellent =
-          totalCountsResult.find((c) => c.answer === "EXCELLENT")?._count
-            .answer || 0;
-        satisfactory =
-          totalCountsResult.find((c) => c.answer === "SATISFACTORY")?._count
-            .answer || 0;
-        average =
-          totalCountsResult.find((c) => c.answer === "AVERAGE")?._count
-            .answer || 0;
-        total = excellent + satisfactory + average;
-
-        const byLocationResult = await prisma.survey.groupBy({
-          by: ["location", "answer"],
-          where: prismaWhere,
-          _count: { answer: true },
-        });
-        const locationMap = new Map<string, any>();
-        byLocationResult.forEach((item) => {
-          if (!locationMap.has(item.location)) {
-            locationMap.set(item.location, {
-              location: item.location,
-              total: 0,
-              excellent: 0,
-              satisfactory: 0,
-              average: 0,
-            });
-          }
-          const loc = locationMap.get(item.location);
-          loc.total += item._count.answer;
-          if (item.answer === "EXCELLENT") loc.excellent += item._count.answer;
-          if (item.answer === "SATISFACTORY")
-            loc.satisfactory += item._count.answer;
-          if (item.answer === "AVERAGE") loc.average += item._count.answer;
-        });
-        byLocation = Array.from(locationMap.values()).map((loc) => ({
-          ...loc,
-          percentages: {
-            excellent:
-              loc.total > 0 ? Math.round((loc.excellent / loc.total) * 100) : 0,
-            satisfactory:
-              loc.total > 0
-                ? Math.round((loc.satisfactory / loc.total) * 100)
-                : 0,
-            average:
-              loc.total > 0 ? Math.round((loc.average / loc.total) * 100) : 0,
-          },
-        }));
-
-        const byDateResult = await prisma.survey.groupBy({
-          by: ["timestamp"],
-          where: prismaWhere,
-          _count: { answer: true },
-          orderBy: { timestamp: "asc" },
-        });
-        const dateMap = new Map<string, any>();
-        byDateResult.forEach((item) => {
-          const date = (item.timestamp as Date).toISOString().split("T")[0];
-          if (!dateMap.has(date)) {
-            dateMap.set(date, {
-              date,
-              total: 0,
-              excellent: 0,
-              satisfactory: 0,
-              average: 0,
-            });
-          }
-          dateMap.get(date).total += item._count.answer;
-        });
-        byDate = Array.from(dateMap.values());
-      }
+      const byDateResult = await prisma.survey.groupBy({
+        by: ["timestamp"],
+        where: whereClause,
+        _count: { answer: true },
+        orderBy: { timestamp: "asc" },
+      });
+      const dateMap = new Map<string, any>();
+      byDateResult.forEach((item) => {
+        const date = (item.timestamp as Date).toISOString().split("T")[0];
+        if (!dateMap.has(date)) {
+          dateMap.set(date, {
+            date,
+            total: 0,
+            excellent: 0,
+            satisfactory: 0,
+            average: 0,
+          });
+        }
+        dateMap.get(date).total += item._count.answer;
+      });
+      const byDate = Array.from(dateMap.values());
 
       const percentages = {
         excellent: total > 0 ? Math.round((excellent / total) * 100) : 0,
@@ -298,76 +264,28 @@ export class SurveyService {
     pagination: any;
   }> {
     try {
-      const { page, limit, skip, sortBy, sortOrder } = parsePagination(query);
+      const { page, limit, sortBy, sortOrder } = parsePagination(query);
+      const skip = (page - 1) * limit;
 
-      const filters: SurveyFilters = {};
-      if (query.location) filters.location = query.location;
-      if (query.answer) filters.answer = query.answer;
-      if (query.startDate) filters.startDate = new Date(query.startDate);
-      if (query.endDate) filters.endDate = new Date(query.endDate);
-      if (query.deviceId) filters.deviceId = query.deviceId;
-      if (query.timeShift) filters.timeShift = query.timeShift;
-      if (query.deviceName) filters.deviceName = query.deviceName;
-      if (query.syncStatus) filters.syncStatus = query.syncStatus;
-      if (query.search) filters.search = query.search;
+      const whereClause = this.buildWhereClause(query);
 
-      const whereClause = this.buildWhereClause(filters);
-
-      let surveys: any[];
-      let total: number;
-
-      if (whereClause.timeShiftAggregation) {
-        const { timeShiftAggregation, ...prismaWhere } = whereClause;
-
-        const pipeline: any[] = [
-          { $match: { $expr: timeShiftAggregation } },
-          {
-            $lookup: {
-              from: "devices",
-              localField: "deviceId",
-              foreignField: "deviceId",
-              as: "device",
+      const total = await prisma.survey.count({ where: whereClause });
+      const surveys = await prisma.survey.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: {
+          [sortBy]: sortOrder,
+        },
+        include: {
+          device: {
+            select: {
+              name: true,
+              location: true,
             },
           },
-          { $unwind: { path: "$device", preserveNullAndEmptyArrays: true } },
-          { $match: prismaWhere },
-          { $sort: { [sortBy]: sortOrder === "asc" ? 1 : -1 } },
-        ];
-
-        const countPipeline = [...pipeline, { $count: "total" }];
-        const dataPipeline = [...pipeline, { $skip: skip }, { $limit: limit }];
-
-        const [totalResult, dataResult] = await Promise.all([
-          prisma.$runCommandRaw({
-            aggregate: "surveys",
-            pipeline: countPipeline,
-            cursor: {},
-          }),
-          prisma.$runCommandRaw({
-            aggregate: "surveys",
-            pipeline: dataPipeline,
-            cursor: {},
-          }),
-        ]);
-
-        // Extract total from the raw aggregation result
-        total = (totalResult as any)?.cursor?.firstBatch?.[0]?.total || 0;
-        // Extract documents from the raw aggregation result
-        surveys = (dataResult as any)?.cursor?.firstBatch || [];
-      } else {
-        total = await prisma.survey.count({ where: whereClause });
-        surveys = await prisma.survey.findMany({
-          where: whereClause,
-          skip,
-          take: limit,
-          orderBy: { [sortBy]: sortOrder },
-          include: {
-            device: {
-              select: { id: true, name: true, status: true, location: true },
-            },
-          },
-        });
-      }
+        },
+      });
 
       const pagination = calculatePagination(page, limit, total);
 
@@ -635,11 +553,10 @@ export class SurveyService {
   static async getShiftAnalytics(filters: SurveyFilters = {}): Promise<any> {
     try {
       const whereClause = this.buildWhereClause(filters);
-      const { timeShiftAggregation, ...prismaWhere } = whereClause;
 
       // Get all surveys with their timestamps
       const surveys = await prisma.survey.findMany({
-        where: prismaWhere,
+        where: whereClause,
         select: {
           answer: true,
           timestamp: true,
@@ -798,51 +715,67 @@ export class SurveyService {
     const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     if (filters.timeShift) {
-      // For MongoDB aggregation, we need to handle timezone conversion
-      // Since Nepal is UTC+5:45, we need to adjust the hour ranges accordingly
-      let timeShiftCondition;
-      switch (filters.timeShift) {
-        case "morning":
-          // Morning: 6:00 AM - 11:59 AM Nepal time
-          // This corresponds to 0:15 AM - 6:14 AM UTC
-          // We'll use 0:00 AM - 6:00 AM UTC as an approximation
-          timeShiftCondition = {
-            $and: [
-              { $gte: [{ $hour: "$timestamp" }, 0] },
-              { $lt: [{ $hour: "$timestamp" }, 6] },
-            ],
-          };
-          break;
-        case "day":
-          // Day: 12:00 PM - 5:59 PM Nepal time
-          // This corresponds to 6:15 AM - 12:14 PM UTC
-          // We'll use 6:00 AM - 12:00 PM UTC as an approximation
-          timeShiftCondition = {
-            $and: [
-              { $gte: [{ $hour: "$timestamp" }, 6] },
-              { $lt: [{ $hour: "$timestamp" }, 12] },
-            ],
-          };
-          break;
-        case "night":
-          // Night: 6:00 PM - 5:59 AM Nepal time
-          // This corresponds to 12:15 PM - 0:14 AM UTC (next day)
-          // We'll use 12:00 PM - 0:00 AM UTC as an approximation
-          timeShiftCondition = {
-            $or: [
-              { $gte: [{ $hour: "$timestamp" }, 12] },
-              { $lt: [{ $hour: "$timestamp" }, 0] },
-            ],
-          };
-          break;
-      }
-      if (timeShiftCondition) {
-        // This is a special marker for aggregation pipeline
-        where.timeShiftAggregation = timeShiftCondition;
+      const timeShiftConditions = this.getTimeShiftConditions(
+        filters.timeShift
+      );
+      if (timeShiftConditions) {
+        andConditions.push({
+          OR: timeShiftConditions.map((cond) => ({ timestamp: cond })),
+        });
       }
     }
 
     return where;
+  }
+
+  private static getTimeShiftConditions(
+    timeShift: string
+  ): { gte?: Date; lt?: Date }[] | null {
+    const now = new Date();
+    // Adjust to Nepal Time Zone (UTC+5:45)
+    const nepalTime = new Date(now.getTime() + (5 * 60 + 45) * 60 * 1000);
+
+    const year = nepalTime.getFullYear();
+    const month = nepalTime.getMonth();
+    const day = nepalTime.getDate();
+
+    switch (timeShift) {
+      case "morning": // 5:00 AM to 11:59 AM
+        return [
+          {
+            gte: new Date(year, month, day, 5, 0, 0),
+            lt: new Date(year, month, day, 12, 0, 0),
+          },
+        ];
+      case "day": // 12:00 PM to 6:59 PM
+        return [
+          {
+            gte: new Date(year, month, day, 12, 0, 0),
+            lt: new Date(year, month, day, 19, 0, 0),
+          },
+        ];
+      case "night": // 7:00 PM to 4:59 AM (next day)
+        const isEvening = nepalTime.getHours() >= 19;
+        if (isEvening) {
+          // Current day's evening shift
+          return [
+            {
+              gte: new Date(year, month, day, 19, 0, 0),
+              lt: new Date(year, month, day + 1, 5, 0, 0),
+            },
+          ];
+        } else {
+          // Previous day's night shift (for morning hours)
+          return [
+            {
+              gte: new Date(year, month, day - 1, 19, 0, 0),
+              lt: new Date(year, month, day, 5, 0, 0),
+            },
+          ];
+        }
+      default:
+        return null;
+    }
   }
 
   /**

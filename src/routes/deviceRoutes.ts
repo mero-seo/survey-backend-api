@@ -21,6 +21,19 @@ router.post(
 router.post("/ping/:deviceId", DeviceController.pingDevice);
 
 /**
+ * Public endpoint for getting device locations during setup
+ */
+router.get("/locations", DeviceController.getDeviceLocations);
+
+/**
+ * Public endpoint for getting device status by deviceId
+ */
+router.get(
+  "/status-by-device-id/:deviceId",
+  DeviceController.getDeviceStatusByDeviceId
+);
+
+/**
  * Protected routes (authentication required)
  */
 router.use(authenticate); // All routes below require authentication
@@ -54,15 +67,15 @@ router.get(
 );
 
 router.get(
-  "/:id/status",
+  "/by-device-id/:deviceId",
   authorize([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VIEWER]),
-  DeviceController.getDeviceStatus
+  DeviceController.getDeviceByDeviceId
 );
 
 router.get(
-  "/:id/config",
-  authorize([UserRole.SUPER_ADMIN, UserRole.ADMIN]),
-  DeviceController.getDeviceConfig
+  "/:id/status",
+  authorize([UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.VIEWER]),
+  DeviceController.getDeviceStatus
 );
 
 /**
@@ -73,12 +86,6 @@ router.put(
   authorize([UserRole.SUPER_ADMIN, UserRole.ADMIN]),
   validate(deviceSchemas.update),
   DeviceController.updateDevice
-);
-
-router.put(
-  "/:id/config",
-  authorize([UserRole.SUPER_ADMIN, UserRole.ADMIN]),
-  DeviceController.updateDeviceConfig
 );
 
 router.put(

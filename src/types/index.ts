@@ -106,17 +106,10 @@ export interface DateStats {
 /**
  * Device related types
  */
-export interface DeviceConfiguration {
-  surveyInterval: number;
-  theme: string;
-  language: string;
-}
-
 export interface DeviceRegistration {
   deviceId: string;
   location: string;
   name: string;
-  configuration?: DeviceConfiguration;
 }
 
 /**

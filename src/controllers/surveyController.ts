@@ -76,13 +76,19 @@ export class SurveyController {
       throw AppError.notFound("Device not found");
     }
 
-    // Create survey
+    // Use server time and convert to Nepal timezone (UTC+5:45)
+    const serverTime = new Date();
+    const nepalTime = new Date(
+      serverTime.getTime() + (5 * 60 + 45) * 60 * 1000
+    ); // UTC+5:45
+
+    // Create survey with server time in Nepal timezone
     const survey = await prisma.survey.create({
       data: {
         deviceId,
         location,
         answer,
-        timestamp,
+        timestamp: nepalTime, // Use server time converted to Nepal timezone
         deviceInfo,
         syncStatus: "SYNCED",
         updatedAt: new Date(),
@@ -195,8 +201,9 @@ export class SurveyController {
 
       // Get unique device names
       const devices = await prisma.device.findMany({
-        where: { status: "ACTIVE" },
-        select: { name: true, location: true },
+        where: { status: "ACTIVE", name: { not: "" } },
+        select: { name: true },
+        distinct: ["name"],
         orderBy: { name: "asc" },
       });
 
@@ -210,7 +217,7 @@ export class SurveyController {
 
       const filterOptions = {
         locations: locations.map((l) => l.location).filter(Boolean),
-        deviceNames: devices.map((d) => d.name).filter(Boolean),
+        deviceNames: devices.map((d) => d.name),
         deviceIds: deviceIds.map((d) => d.deviceId).filter(Boolean),
         timeShifts: [
           { value: "morning", label: "Morning (6:00AM–11:59AM)" },

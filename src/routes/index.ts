@@ -3,6 +3,7 @@ import authRoutes from "./authRoutes";
 import surveyRoutes from "./surveyRoutes";
 import deviceRoutes from "./deviceRoutes";
 import { config } from "../config/env";
+import { apiLimiter } from "../middleware/rateLimiter";
 
 const router = Router();
 
@@ -21,8 +22,8 @@ router.get("/health", (_req, res) => {
 
 // Mount route modules
 router.use(`${apiVersion}/auth`, authRoutes);
-router.use(`${apiVersion}/surveys`, surveyRoutes);
-router.use(`${apiVersion}/devices`, deviceRoutes);
+router.use(`${apiVersion}/surveys`, apiLimiter, surveyRoutes);
+router.use(`${apiVersion}/devices`, apiLimiter, deviceRoutes);
 
 // API documentation endpoint
 router.get(`${apiVersion}/docs`, (_req, res) => {
@@ -63,12 +64,13 @@ router.get(`${apiVersion}/docs`, (_req, res) => {
         "GET /devices/:id": "Get device by ID",
         "PUT /devices/:id": "Update device",
         "DELETE /devices/:id": "Delete device (super admin)",
-        "GET /devices/:id/config": "Get device configuration",
-        "PUT /devices/:id/config": "Update device configuration",
         "GET /devices/:id/status": "Get device status",
         "POST /devices/:id/ping": "Ping device (update last seen)",
         "GET /devices/location/:location": "Get devices by location",
         "PUT /devices/bulk-status": "Bulk update device status",
+        "GET /devices/locations": "Get all device locations (public)",
+        "GET /devices/status-by-device-id/:deviceId":
+          "Get device status by device ID (public)",
       },
     },
     authentication: {
