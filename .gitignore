@@ -121,4 +121,4 @@ uploads/
 temp/
 
 # Redis dump
-dump.rdb 
+dump.rdb
