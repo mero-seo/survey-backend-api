@@ -12,7 +12,7 @@ const prisma =
     log: ["query", "info", "warn", "error"],
   });
 
-if (process.env.NODE_ENV === "development") {
+if (process.env.NODE_ENV !== "test") {
   globalThis.__prisma = prisma;
 }
 
